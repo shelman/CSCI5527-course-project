@@ -34,43 +34,54 @@ def count_char(input_str):
         return count
 
 def preprocess(train_logs, train_scores, test_logs):
-    count_id_list = list(train_logs.groupby(["id"]).count()["event_id"])
-    # correspond labels with the samples
-    train_scores = train_scores["score"].repeat(count_id_list).reset_index()
+    # set index using id
+    train_scores = train_scores.set_index(["id"])
 
-
+    # one hot encode the activity attribute 
     categories_in_activity = ["Nonproduction", "Input", "Remove/Cut", "Replace", "Paste"]
     train_logs.loc[~train_logs["activity"].isin(categories_in_activity), "activity"] = "Move"
-    one_hot_encoder = pd.get_dummies(train_logs["activity"])
+    one_hot_encoder = pd.get_dummies(train_logs["activity"], dtype=int)
     train_logs = train_logs.drop(columns=["activity"])
     train_logs = pd.concat([train_logs, one_hot_encoder], axis=1)
 
     train_logs["text_change"] = train_logs["text_change"].apply(count_char)
 
-    train_logs = train_logs.drop(columns=["id", "down_event", "up_event"])
+    # remove categorical attributes
+    train_logs = train_logs.drop(columns=["down_event", "up_event"])
+
+    # set index using id attribute
+    train_logs = train_logs.set_index(["id"])
 
     # print(train_logs.head(10))
     # print(train_logs.info())
+    return train_logs, train_scores, test_logs
 
 
 class TrainingDataset(Dataset):
     def __init__(self, data, labels):
-        self.data = data
-        self.labels = labels
+        self.data = self._generate_senquence_(data)
+        self.labels = labels.values
+
+    def _generate_senquence_(self, data):
+        sequences_data = []
+        grouped_data = data.groupby(["id"])
+        for _, x in grouped_data:
+            sequences_data.append(x.values)
+        return sequences_data
 
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, idx):
-        data = torch.tensor(self.data[idx])
-        label = torch.tensor(self.labels[idx])
-        return data, label
+        x = torch.tensor(self.data[idx])
+        y =  torch.tensor(self.labels[idx])
+        return x, y
 
 def create_training_dataloader():
     train_logs, train_scores, test_logs = get_data()
 
-    preprocess(train_logs, train_scores, test_logs)
+    train_logs, train_scores, test_logs = preprocess(train_logs, train_scores, test_logs)
 
     training_dataset = TrainingDataset(train_logs, train_scores)
-    training_loader = DataLoader(training_dataset, batch_size=32, shuffle=True)
+    training_loader = DataLoader(training_dataset, batch_size=32, shuffle=True) # need to implement collate_fn=pad_sequences
     return training_loader, len(training_dataset)
