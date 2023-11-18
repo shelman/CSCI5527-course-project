@@ -56,7 +56,6 @@ def preprocess(train_logs, train_scores, test_logs):
     # print(train_logs.info())
     return train_logs, train_scores, test_logs
 
-
 class TrainingDataset(Dataset):
     def __init__(self, data, labels):
         self.data = self._generate_senquence_(data)
@@ -73,9 +72,20 @@ class TrainingDataset(Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
-        x = torch.tensor(self.data[idx])
-        y =  torch.tensor(self.labels[idx])
-        return x, y
+        data = torch.tensor(self.data[idx])
+        labels = torch.tensor(self.labels[idx])
+        return data, labels
+
+def collate_fn(batch):
+    sequences, labels = zip(*batch)
+    max_length = max(len(seq) for seq in sequences)
+    padded = [padding(seq, max_length) for seq in sequences]
+    return torch.stack(padded), torch.stack(labels)
+
+def padding(sequence, max_length):
+    pad_zeros = torch.zeros([max_length - len(sequence), sequence.shape[1]], dtype=float)
+    padded_seq = torch.cat((sequence, pad_zeros))
+    return padded_seq
 
 def create_training_dataloader():
     train_logs, train_scores, test_logs = get_data()
@@ -83,5 +93,5 @@ def create_training_dataloader():
     train_logs, train_scores, test_logs = preprocess(train_logs, train_scores, test_logs)
 
     training_dataset = TrainingDataset(train_logs, train_scores)
-    training_loader = DataLoader(training_dataset, batch_size=32, shuffle=True) # need to implement collate_fn=pad_sequences
+    training_loader = DataLoader(training_dataset, batch_size=32, shuffle=True, collate_fn=collate_fn)
     return training_loader, len(training_dataset)

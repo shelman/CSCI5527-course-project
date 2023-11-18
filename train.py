@@ -28,7 +28,7 @@ class LSTM(nn.Module):
 # Define input size, hidden layer size, and output size
 input_size = 13
 hidden_size = 128
-output_size = 12
+output_size = 1
 
 # # Instantiate the model
 model = LSTM(input_size, hidden_size, output_size).to(device)
@@ -36,24 +36,24 @@ model = LSTM(input_size, hidden_size, output_size).to(device)
 print(model)
 
 # Define loss function and optimizer
-criterion = nn.CrossEntropyLoss()
-optimizer = optim.SGD(model.parameters(), lr=0.01)
+criterion = nn.MSELoss()
+optimizer = optim.Adam(model.parameters())
 
 # training dataset
-epochs = 10
+epochs = 25
 for epoch in range(epochs):
     print(f"Epoch {epoch + 1}/{epochs}")
     print("-" * 10)
     running_loss = 0
-    running_corrects = 0
     for images, labels in training_loader:
         # move to the specified device
-        images, labels = images.to(device), labels.to(device)
+        images, labels = images.float().to(device), labels.float().to(device)
 
         # forward
         optimizer.zero_grad()
         outputs = model(images)
-        _, preds = torch.max(outputs, dim=1)
+        # print(outputs)
+        # print(labels)
         loss = criterion(outputs, labels)
 
         loss.backward()
@@ -61,9 +61,7 @@ for epoch in range(epochs):
 
     # statistics
         running_loss += loss.item() * images.size(0)
-        running_corrects += torch.sum(preds == labels.data)
 
     epoch_loss = running_loss / sample_size
-    epoch_acc = running_corrects.double() / sample_size
 
-    print(f"Training Loss: {epoch_loss:.4f} Acc: {epoch_acc:.4f}")
+    print(f"Training Loss: {epoch_loss:.4f}")
