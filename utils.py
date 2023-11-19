@@ -1,6 +1,6 @@
 import pandas as pd
 import torch
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, random_split
 
 def get_data():
     # train logs contains about 5000 logs without labels
@@ -93,5 +93,18 @@ def create_training_dataloader():
     train_logs, train_scores, test_logs = preprocess(train_logs, train_scores, test_logs)
 
     training_dataset = TrainingDataset(train_logs, train_scores)
-    training_loader = DataLoader(training_dataset, batch_size=32, shuffle=True, collate_fn=collate_fn)
-    return training_loader, len(training_dataset)
+    #training_loader = DataLoader(training_dataset, batch_size=32, shuffle=True, collate_fn=collate_fn)
+
+    # Define the sizes for training and validation sets
+    dataset_size = len(training_dataset)
+    train_size = int(0.8 * dataset_size)  # 80% for training
+    val_size = dataset_size - train_size  # 20% for validation
+
+    # Use random_split to create training and validation datasets
+    train_dataset, val_dataset = random_split(training_dataset, [train_size, val_size])
+
+    # Now you can create DataLoader instances for training and validation
+    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True, collate_fn=collate_fn)
+    val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False, collate_fn=collate_fn)
+
+    return train_loader, val_loader, len(training_dataset)
