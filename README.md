@@ -8,7 +8,7 @@ This can be run to split the large csv file into individual ones for each essay 
 run once. This is useful for:
 - Testing out model architectures on a subset of the essays, by using the `cutoff` parameter to preprocess only a subset
 and use that as the model inputs.
-- Training models without reading the big csv into memory at once (helps a lot with speed on Sam's computer).
+- Training models without reading the big csv into memory at once (helps a lot with speed on my computer).
 
 Preprocessing splits the dataset into training and test based on the `train_pct` parameter.
 
