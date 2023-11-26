@@ -2,7 +2,7 @@
 
 Dataset available on https://www.kaggle.com/competitions/linking-writing-processes-to-writing-quality/data
 
-## Notes from Sam on splitting into individual csvs via `preprocess.py`
+### Notes from Sam on splitting into individual csvs via `preprocess.py`
 
 This can be run to split the large csv file into individual ones for each essay - it only needs to be
 run once. This is useful for:
