@@ -14,27 +14,40 @@ device = (
 )
 '''
 device = 'cpu'
+batch_size = 32
 
-training_loader, validation_loader, sample_size = create_training_dataloader()
+training_loader, validation_loader, sample_size = create_training_dataloader(batch_size=batch_size)
 
-class LSTM(nn.Module):
+class myNN(nn.Module):
     def __init__(self, input_size, hidden_size, output_size):
-        super(LSTM, self).__init__()
+        super(myNN, self).__init__()
+        self.conv1 = nn.Conv2d(1, input_size, kernel_size=(10, 13))
+        self.relu1 = nn.LeakyReLU()
+        self.pool1 = nn.MaxPool2d(kernel_size=(10,1))
+        #self.adaptivepool = nn.AdaptiveAvgPool2d(1)
         self.lstm = nn.LSTM(input_size=input_size, hidden_size=hidden_size, batch_first=True)
         self.fc = nn.Linear(in_features=hidden_size, out_features=output_size)
 
-    def forward(self, x):
-        output, _ = self.lstm(x)
-        x = self.fc(output[:, 0, :])
+    def forward(self, input):
+        input = torch.unsqueeze(input, dim=1)
+        x = self.conv1(input)
+        x = self.relu1(x)
+        x = self.pool1(x)
+        x = torch.squeeze(x, dim=-1)
+        x = x.permute(0, 2, 1)
+        #x = self.adaptivepool(x)
+        output, (h_n, c_n) = self.lstm(x)
+        #h_n.view(batch_size,-1)
+        x = self.fc(h_n[-1,:,:])
         return x
 
 # Define input size, hidden layer size, and output size
-input_size = 13
+input_size = 16
 hidden_size = 128
 output_size = 1
 
 # # Instantiate the model
-model = LSTM(input_size, hidden_size, output_size).to(device)
+model = myNN(input_size, hidden_size, output_size).to(device)
 
 print(model)
 

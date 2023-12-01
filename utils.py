@@ -1,6 +1,9 @@
 import pandas as pd
+import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader, random_split
+from sklearn.preprocessing import StandardScaler
+
 
 def get_data():
     # train logs contains about 5000 logs without labels
@@ -42,18 +45,21 @@ def preprocess(train_logs, train_scores, test_logs):
     train_logs.loc[~train_logs["activity"].isin(categories_in_activity), "activity"] = "Move"
     one_hot_encoder = pd.get_dummies(train_logs["activity"], dtype=int)
     train_logs = train_logs.drop(columns=["activity"])
-    train_logs = pd.concat([train_logs, one_hot_encoder], axis=1)
-
     train_logs["text_change"] = train_logs["text_change"].apply(count_char)
 
     # remove categorical attributes
     train_logs = train_logs.drop(columns=["down_event", "up_event"])
 
+    no_scale_columns = train_logs[['id','text_change']]
+    train_logs = train_logs.drop(columns=['id','text_change'])
+    scaler = StandardScaler()
+    train_logs = pd.DataFrame(scaler.fit_transform(train_logs), columns=train_logs.columns)
+
+    train_logs = pd.concat([train_logs, one_hot_encoder, no_scale_columns], axis=1)
+
     # set index using id attribute
     train_logs = train_logs.set_index(["id"])
 
-    # print(train_logs.head(10))
-    # print(train_logs.info())
     return train_logs, train_scores, test_logs
 
 class TrainingDataset(Dataset):
@@ -78,22 +84,30 @@ class TrainingDataset(Dataset):
 
 def collate_fn(batch):
     sequences, labels = zip(*batch)
-    max_length = max(len(seq) for seq in sequences)
-    padded = [padding(seq, max_length) for seq in sequences]
-    return torch.stack(padded), torch.stack(labels)
+    #max_length = max(len(seq) for seq in sequences)
+    #padded = [padding(seq, max_length) for seq in sequences]
+    return torch.stack(sequences), torch.stack(labels)
 
 def padding(sequence, max_length):
     pad_zeros = torch.zeros([max_length - len(sequence), sequence.shape[1]], dtype=float)
-    padded_seq = torch.cat((sequence, pad_zeros))
+    padded_seq = torch.cat((pad_zeros, sequence))
     return padded_seq
 
-def create_training_dataloader():
+def create_training_dataloader(batch_size):
     train_logs, train_scores, test_logs = get_data()
 
     train_logs, train_scores, test_logs = preprocess(train_logs, train_scores, test_logs)
 
     training_dataset = TrainingDataset(train_logs, train_scores)
-    #training_loader = DataLoader(training_dataset, batch_size=32, shuffle=True, collate_fn=collate_fn)
+
+    #padding entire set
+    max_length = max(len(seq) for seq in training_dataset.data)
+    for i in range(len(training_dataset.data)):
+        arr = training_dataset.data[i]
+        pad_zeros = torch.zeros([max_length - len(arr), arr.shape[1]], dtype=float)
+        arr = torch.tensor(arr)
+        training_dataset.data[i] = torch.cat((pad_zeros, arr))
+
 
     # Define the sizes for training and validation sets
     dataset_size = len(training_dataset)
@@ -104,7 +118,7 @@ def create_training_dataloader():
     train_dataset, val_dataset = random_split(training_dataset, [train_size, val_size])
 
     # Now you can create DataLoader instances for training and validation
-    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True, collate_fn=collate_fn)
-    val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False, collate_fn=collate_fn)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, collate_fn=collate_fn)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, collate_fn=collate_fn)
 
     return train_loader, val_loader, len(training_dataset)
