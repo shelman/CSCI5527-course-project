@@ -54,7 +54,7 @@ for epoch in range(epochs):
         outputs = model(images)
         # print(outputs)
         # print(labels)
-        loss = criterion(outputs, labels)
+        loss = torch.sqrt(criterion(outputs, labels))
 
         loss.backward()
         optimizer.step()
