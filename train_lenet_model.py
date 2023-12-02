@@ -2,14 +2,14 @@ import torch
 from torch.utils.data import DataLoader
 from train_test_fns import test_model, train_model
 
-from models.enum_conv_model import EnumConvModel
+from models.lenet_inspired_model import LeNetInspiredModel
 from split_dataset import SplitDataset
 from utils import collate_fn
 
 
 def create_dataloader(logs_folder, scores_file):
     dataset = SplitDataset(logs_folder, scores_file)
-    return DataLoader(dataset, batch_size=20, shuffle=True, collate_fn=collate_fn)
+    return DataLoader(dataset, batch_size=50, shuffle=True, collate_fn=collate_fn)
 
 
 def main():
@@ -22,7 +22,7 @@ def main():
         else "cpu"
     )
 
-    model = EnumConvModel()
+    model = LeNetInspiredModel()
 
     training_loader = create_dataloader(
         "./data/preprocessed/train_logs_split_enum",

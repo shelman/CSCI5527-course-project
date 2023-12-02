@@ -70,5 +70,5 @@ def test_model(model, test_loader, loss_fn=torch.nn.functional.mse_loss,
             total_error += torch.sum(torch.abs(scores_predicted - scores))
             total_loss += loss
 
-        print(f"total loss: {total_loss}")
+        print(f"total test loss: {total_loss}")
         print(f"average error: {total_error / (len(test_loader)*test_loader.batch_size)}")

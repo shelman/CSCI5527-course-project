@@ -16,5 +16,3 @@ Preprocessing doesn't automatically preprocess the `train_scores.csv` csv file s
 corresponding `SplitDataset` class reads it in and uses the id to match the score to an essay. I recommend `cp`-ing the
 `train_scores.csv` file to `test_scores.csv` or just using the same scores file for both stages
 since extra scores will be ignored by the `SplitDataset` class anyway.
-
-See `train_one_hot_conv_model.py` and `train_enum_conv_model.py` for examples.
