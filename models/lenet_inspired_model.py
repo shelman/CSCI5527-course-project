@@ -17,37 +17,34 @@ class LeNetInspiredModel(nn.Module):
         self.layers = nn.Sequential(
             nn.BatchNorm2d(1),
             
-            nn.Conv2d(1, 5, kernel_size=5),
+            nn.Conv2d(1, 3, kernel_size=5),
             nn.ReLU(),
-            nn.MaxPool2d(kernel_size=(2, 1)),
+            nn.MaxPool2d(kernel_size=(5, 1)),
             
-            nn.Conv2d(5, 10, kernel_size=(5, 1)),
+            nn.Conv2d(3, 6, kernel_size=(5, 1)),
             nn.ReLU(),
-            nn.MaxPool2d(kernel_size=(2, 1)),
-            
-            nn.Conv2d(10, 5, kernel_size=(5, 1)),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=(2, 1)),
-
-            nn.Conv2d(5, 1, kernel_size=(5, 1)),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=(2, 1)),
+            nn.MaxPool2d(kernel_size=(5, 1)),
 
             # this layer is important for getting the arrays all to the 
             # same size; because zero-padding works on a batch level, 
             # the different batches might have different sizes for their 
             # input arrays
-            nn.AdaptiveAvgPool2d((1000, 1)),
+            nn.AdaptiveMaxPool2d((100, 1)),
             
-            nn.Flatten(),
+            # flatten the channel, height and width dimensions
+            nn.Flatten(start_dim=1, end_dim=3),
             
-            nn.Linear(1000, 100),
+            nn.Linear(600, 100),
             nn.ReLU(),
             
             nn.Linear(100, 1),
         )
 
     def forward(self, x):
+        for layer in self.layers:
+            x = layer(x)
+            #print(layer.__class__.__name__, 'output shape:\t', x.shape)
+        return x
         return self.layers(x)
     
     def preprocess_fn(self, essay_batch):

@@ -1,3 +1,5 @@
+import math
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -36,7 +38,12 @@ def train_model(model, training_loader, loss_fn_cls=nn.MSELoss,
             optimizer.step()
 
             epoch_loss += loss.item()
-        print(f"loss for epoch {epoch}: {epoch_loss}")
+        
+        # the batch-level mse losses are summed together above, 
+        # so we need to divide by the number of batches to get the 
+        # essay-level average
+        epoch_rmse_loss = math.sqrt(epoch_loss / len(training_loader))
+        print(f"rmse loss for epoch {epoch}: {epoch_rmse_loss}")
 
     return model
 
@@ -47,12 +54,8 @@ def test_model(model, test_loader, loss_fn=torch.nn.functional.mse_loss,
     model.eval()
     with torch.no_grad():
 
-        # total loss is the mse loss. total error is the total
-        # of mispredictions (score - score_predicted), so we
-        # can compute the average misprediction and use that as
-        # a benchmark
-        total_loss = 0
-        total_error = 0
+        # mse loss for the entire dataset
+        testing_loss = 0
 
         for essays, scores in test_loader:
 
@@ -67,8 +70,10 @@ def test_model(model, test_loader, loss_fn=torch.nn.functional.mse_loss,
             scores_predicted = torch.squeeze(scores_predicted, 1)
             loss = loss_fn(scores_predicted, scores)
 
-            total_error += torch.sum(torch.abs(scores_predicted - scores))
-            total_loss += loss
+            testing_loss += loss
 
-        print(f"total test loss: {total_loss}")
-        print(f"average error: {total_error / (len(test_loader)*test_loader.batch_size)}")
+        # the batch-level mse losses are summed together above, 
+        # so we need to divide by the number of batches to get the 
+        # essay-level average
+        test_rmse_loss = math.sqrt(testing_loss / len(test_loader))
+        print(f"test loss: {test_rmse_loss}")
