@@ -24,6 +24,9 @@ class myNN(nn.Module):
         self.conv1 = nn.Conv2d(1, input_size, kernel_size=(10, 13))
         self.relu1 = nn.LeakyReLU()
         self.pool1 = nn.MaxPool2d(kernel_size=(10,1))
+        #self.conv2 = nn.Conv2d(input_size, 32, kernel_size=(6, 8))
+        #self.relu2 = nn.LeakyReLU()
+        #self.pool2 = nn.MaxPool2d(kernel_size=(4,1))
         #self.adaptivepool = nn.AdaptiveAvgPool2d(1)
         self.lstm = nn.LSTM(input_size=input_size, hidden_size=hidden_size, batch_first=True)
         self.fc = nn.Linear(in_features=hidden_size, out_features=output_size)
@@ -33,12 +36,16 @@ class myNN(nn.Module):
         x = self.conv1(input)
         x = self.relu1(x)
         x = self.pool1(x)
+        #x = self.conv2(x)
+        #x = self.relu2(x)
+        #x = self.pool2(x)
         x = torch.squeeze(x, dim=-1)
         x = x.permute(0, 2, 1)
         #x = self.adaptivepool(x)
         output, (h_n, c_n) = self.lstm(x)
         #h_n.view(batch_size,-1)
-        x = self.fc(h_n[-1,:,:])
+        #x = self.fc(output[:,:,:])
+        #x = self.fc(h_n[-1,:,:])
         return x
 
 # Define input size, hidden layer size, and output size
@@ -49,7 +56,6 @@ output_size = 1
 # # Instantiate the model
 model = myNN(input_size, hidden_size, output_size).to(device)
 
-print(model)
 
 # Define loss function and optimizer
 criterion = nn.MSELoss()
