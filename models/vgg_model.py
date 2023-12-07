@@ -22,19 +22,21 @@ class VGGModel(nn.Module):
         if truncate_columns:
             initial_columns = 3
 
-        self.layers = nn.Sequential(
+        self.convolutional_layers = nn.Sequential(
             nn.BatchNorm2d(1),
             
             nn.Conv2d(1, 3, kernel_size=3, padding=1),
             nn.ReLU(),
             nn.Conv2d(3, 5, kernel_size=3, padding=1),
             nn.ReLU(),
-            nn.Conv2d(5, 7, kernel_size=3, padding=1),
-            nn.ReLU(),
             nn.MaxPool2d(kernel_size=(5, 1)),
             
+            nn.Conv2d(5, 7, kernel_size=3, padding=1),
+            nn.ReLU(),
             nn.Conv2d(7, 9, kernel_size=3, padding=1),
             nn.ReLU(),
+            nn.MaxPool2d(kernel_size=(5, 1)),
+
             nn.Conv2d(9, 11, kernel_size=3, padding=1),
             nn.ReLU(),
             nn.Conv2d(11, 13, kernel_size=3, padding=1),
@@ -46,20 +48,41 @@ class VGGModel(nn.Module):
             # the different batches might have different sizes for their 
             # input arrays
             nn.AdaptiveMaxPool2d((10, 1)),
-            
-            # flatten the channel, height and width dimensions
-            nn.Flatten(start_dim=1, end_dim=3),
-            
-            nn.Linear(130, 20),
-            nn.ReLU(),
-            
-            nn.Linear(20, 1),
+
+            # flatten the height and width dimensions
+            nn.Flatten(start_dim=2, end_dim=3),
         )
 
+        self.lstm = nn.LSTM(13, 62, batch_first=True)
+        self.post_lstm_flatten = nn.Flatten(start_dim=1, end_dim=2)
+
+        self.linear_layers = nn.Sequential(
+            nn.Linear(620, 10),
+            nn.Linear(10, 1),
+        )
+        
+
     def forward(self, x):
-        for layer in self.layers:
+        # run the convolutional part of the network
+        for layer in self.convolutional_layers:
             x = layer(x)
             #print(layer.__class__.__name__, 'output shape:\t', x.shape)
+
+        # move the channel dimension to the end to prepare for the lstm
+        x = x.permute(0, 2, 1)
+        #print('Permute output shape:\t', x.shape)
+        
+        x, (h_n, c_n) = self.lstm(x)
+        #print('LSTM output shape:\t', x.shape)
+
+        x = self.post_lstm_flatten(x)
+        #print('Post-LSTM flatten output shape:\t', x.shape)
+
+        # run the final linear part of the network
+        for layer in self.linear_layers:
+            x = layer(x)
+            #print(layer.__class__.__name__, 'output shape:\t', x.shape)
+
         return x
     
     def preprocess_fn(self, essay_batch):

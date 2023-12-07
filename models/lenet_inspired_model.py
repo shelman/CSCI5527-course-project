@@ -51,6 +51,8 @@ class LeNetInspiredModel(nn.Module):
         for layer in self.layers:
             x = layer(x)
             #print(layer.__class__.__name__, 'output shape:\t', x.shape)
+
+        print('Output shape:\t', x.shape)
         return x
     
     def preprocess_fn(self, essay_batch):
