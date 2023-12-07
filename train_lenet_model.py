@@ -9,7 +9,7 @@ from utils import collate_fn
 
 def create_dataloader(logs_folder, scores_file):
     dataset = SplitDataset(logs_folder, scores_file)
-    return DataLoader(dataset, batch_size=5, shuffle=True, collate_fn=collate_fn)
+    return DataLoader(dataset, batch_size=500, shuffle=True, collate_fn=collate_fn)
 
 
 def main():
@@ -22,14 +22,14 @@ def main():
         else "cpu"
     )
 
-    model = LeNetInspiredModel()
+    model = LeNetInspiredModel(truncate_columns=False)
 
     training_loader = create_dataloader(
         "./data/preprocessed/train_logs_split_enum",
         "./data/train_scores.csv",
     )
 
-    model = train_model(model, training_loader, epochs=5, device=device)
+    model = train_model(model, training_loader, epochs=20, device=device)
 
     test_loader = create_dataloader(
         "./data/preprocessed/test_logs_split_enum",
