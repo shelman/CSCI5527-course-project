@@ -40,7 +40,7 @@ class ConvLSTMModel(nn.Module):
 
             nn.Conv2d(9, 11, kernel_size=3, padding=1),
             nn.ReLU(),
-            nn.Conv2d(11, 13, kernel_size=3, padding=1),
+            nn.Conv2d(11, 16, kernel_size=3, padding=1),
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=(5, initial_columns)),
 
@@ -54,7 +54,7 @@ class ConvLSTMModel(nn.Module):
             nn.Flatten(start_dim=2, end_dim=3),
         )
 
-        self.lstm = nn.LSTM(13, 62, batch_first=True)
+        self.lstm = nn.LSTM(16, 62, batch_first=True)
         self.post_lstm_flatten = nn.Flatten(start_dim=1, end_dim=2)
 
         self.linear_layers = nn.Sequential(
