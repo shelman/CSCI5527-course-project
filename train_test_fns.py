@@ -10,7 +10,8 @@ be agnostic to the structure of the model.
 """
 
 def train_model(model, training_loader, loss_fn_cls=nn.MSELoss,
-                optimizer_cls=optim.Adam, epochs=10, device="cpu"):
+                optimizer_cls=optim.Adam, epochs=10, device="cpu", 
+                print_progress=True):
 
     loss_function = loss_fn_cls()
     optimizer = optimizer_cls(model.parameters())
@@ -43,7 +44,9 @@ def train_model(model, training_loader, loss_fn_cls=nn.MSELoss,
         # so we need to divide by the number of batches to get the 
         # essay-level average
         epoch_rmse_loss = math.sqrt(epoch_loss / len(training_loader))
-        print(f"rmse loss for epoch {epoch}: {epoch_rmse_loss}")
+        
+        if print_progress:
+            print(f"rmse loss for epoch {epoch}: {epoch_rmse_loss}")
 
     return model
 
@@ -77,3 +80,5 @@ def test_model(model, test_loader, loss_fn=torch.nn.functional.mse_loss,
         # essay-level average
         test_rmse_loss = math.sqrt(testing_loss / len(test_loader))
         print(f"test loss: {test_rmse_loss}")
+        
+        return test_rmse_loss

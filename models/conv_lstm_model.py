@@ -2,10 +2,11 @@ import torch
 import torch.nn as nn
 
 
-class VGGModel(nn.Module):
+class ConvLSTMModel(nn.Module):
     """
     Model designed to perform a 2d convolution on the essays 
-    with their activity encoded as an enum.
+    with their activity encoded as an enum, followed by an
+    LSTM.
 
     Uses VGG (multiple smaller convolutions between max pooling) as
     per the description in the D2L.ai book. Applies padding so that
@@ -13,7 +14,7 @@ class VGGModel(nn.Module):
     """
 
     def __init__(self, truncate_columns=False):
-        super(VGGModel, self).__init__()
+        super(ConvLSTMModel, self).__init__()
 
         # optional extension gets rid of the cursor_position and
         # word_count columns as part of preprocessing
@@ -50,11 +51,14 @@ class VGGModel(nn.Module):
             nn.AdaptiveMaxPool2d((10, 1)),
 
             # flatten the height and width dimensions
-            nn.Flatten(start_dim=1, end_dim=3),
+            nn.Flatten(start_dim=2, end_dim=3),
         )
-    
+
+        self.lstm = nn.LSTM(13, 62, batch_first=True)
+        self.post_lstm_flatten = nn.Flatten(start_dim=1, end_dim=2)
+
         self.linear_layers = nn.Sequential(
-            nn.Linear(130, 10),
+            nn.Linear(620, 10),
             nn.Linear(10, 1),
         )
         
@@ -64,6 +68,16 @@ class VGGModel(nn.Module):
         for layer in self.convolutional_layers:
             x = layer(x)
             #print(layer.__class__.__name__, 'output shape:\t', x.shape)
+
+        # move the channel dimension to the end to prepare for the lstm
+        x = x.permute(0, 2, 1)
+        #print('Permute output shape:\t', x.shape)
+        
+        x, (h_n, c_n) = self.lstm(x)
+        #print('LSTM output shape:\t', x.shape)
+
+        x = self.post_lstm_flatten(x)
+        #print('Post-LSTM flatten output shape:\t', x.shape)
 
         # run the final linear part of the network
         for layer in self.linear_layers:
