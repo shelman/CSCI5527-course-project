@@ -25,40 +25,48 @@ class ConvLSTMModel(nn.Module):
 
         self.convolutional_layers = nn.Sequential(
             nn.BatchNorm2d(1),
-            
-            nn.Conv2d(1, 3, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.Conv2d(3, 5, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=(5, 1)),
-            
-            nn.Conv2d(5, 7, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.Conv2d(7, 9, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=(5, 1)),
 
-            nn.Conv2d(9, 11, kernel_size=3, padding=1),
+            nn.Conv2d(1, 6, kernel_size=(5, 3), padding=1),
             nn.ReLU(),
-            nn.Conv2d(11, 16, kernel_size=3, padding=1),
+            nn.MaxPool2d(kernel_size=(5, 1)),
+            
+            nn.Conv2d(6, 16, kernel_size=(5, initial_columns)),
             nn.ReLU(),
-            nn.MaxPool2d(kernel_size=(5, initial_columns)),
+            nn.MaxPool2d(kernel_size=(5, 1)),
+            
+            # nn.Conv2d(1, 3, kernel_size=3, padding=1),
+            # nn.ReLU(),
+            # nn.Conv2d(3, 6, kernel_size=3, padding=1),
+            # nn.ReLU(),
+            # nn.MaxPool2d(kernel_size=(5, 1)),
+            
+            # nn.Conv2d(6, 10, kernel_size=3, padding=1),
+            # nn.ReLU(),
+            # nn.Conv2d(10, 16, kernel_size=3, padding=1),
+            # nn.ReLU(),
+            # nn.MaxPool2d(kernel_size=(5, initial_columns)),
+
+            # nn.Conv2d(9, 11, kernel_size=3, padding=1),
+            # nn.ReLU(),
+            # nn.Conv2d(11, 16, kernel_size=3, padding=1),
+            # nn.ReLU(),
+            # nn.MaxPool2d(kernel_size=(5, initial_columns)),
 
             # this layer is important for getting the arrays all to the 
             # same size; because zero-padding works on a batch level, 
             # the different batches might have different sizes for their 
             # input arrays
-            nn.AdaptiveMaxPool2d((10, 1)),
+            nn.AdaptiveMaxPool2d((15, 1)),
 
             # flatten the height and width dimensions
             nn.Flatten(start_dim=2, end_dim=3),
         )
 
-        self.lstm = nn.LSTM(16, 62, batch_first=True)
+        self.lstm = nn.LSTM(16, 200, batch_first=True)
         self.post_lstm_flatten = nn.Flatten(start_dim=1, end_dim=2)
 
         self.linear_layers = nn.Sequential(
-            nn.Linear(620, 10),
+            nn.Linear(3000, 10),
             nn.Linear(10, 1),
         )
         

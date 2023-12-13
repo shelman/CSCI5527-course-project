@@ -83,7 +83,7 @@ def main():
         f"{BASE_PATH}/train_logs.csv", 
         f"{OUT_PATH}/{train_logs_dir}", 
         f"{OUT_PATH}/{test_logs_dir}", 
-        cutoff=500, 
+        #cutoff=1500, 
         train_pct=0.8,
         one_hot_activities=use_one_hot_activities
     )
