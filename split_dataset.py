@@ -13,9 +13,13 @@ class SplitDataset(Dataset):
     Relies on the presence of a scores file as well, which does not need
     to be preprocessed from that provided by the competition.
     """
-    def __init__(self, logs_folder, scores_file):
+    def __init__(self, logs_folder, scores_file, cutoff=None):
         self.essay_files = list(Path(logs_folder).glob("*.csv"))
         self.file_count = len(self.essay_files)
+        
+        if cutoff is not None:
+            self.essay_files = self.essay_files[:cutoff]
+            self.file_count = len(self.essay_files)
 
         self.scores = pd.read_csv(scores_file)
         self.scores.set_index("id")

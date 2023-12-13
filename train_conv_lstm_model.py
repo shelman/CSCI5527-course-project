@@ -29,7 +29,7 @@ def main():
         "./data/train_scores.csv",
     )
 
-    model = train_model(model, training_loader, epochs=30, device=device)
+    model = train_model(model, training_loader, epochs=15, device=device)
 
     test_loader = create_dataloader(
         "./data/preprocessed/test_logs_split_enum",
