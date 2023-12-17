@@ -22,21 +22,37 @@ def main():
         else "cpu"
     )
 
-    model = ConvLSTMModel(truncate_columns=False)
+    results = dict()
+    hyper_params = ConvLSTMModel.hyper_param_search()
+    for channels in hyper_params["channels"]:
+        for final_pool in hyper_params["final_pool"]:
+            for lstm_hidden in hyper_params["lstm_hidden"]:
+                hp = dict(
+                    channels=channels, 
+                    final_pool=final_pool, 
+                    lstm_hidden=lstm_hidden, 
+                )
+                model = ConvLSTMModel(truncate_columns=False, **hp)
 
-    training_loader = create_dataloader(
-        "./data/preprocessed/train_logs_split_enum",
-        "./data/train_scores.csv",
-    )
+                training_loader = create_dataloader(
+                    "./data/preprocessed/train_logs_split_enum",
+                    "./data/train_scores.csv",
+                )
 
-    model = train_model(model, training_loader, epochs=15, device=device)
+                model = train_model(model, training_loader, epochs=10, device=device, 
+                                    print_progress=False)
 
-    test_loader = create_dataloader(
-        "./data/preprocessed/test_logs_split_enum",
-        "./data/test_scores.csv",
-    )
+                test_loader = create_dataloader(
+                    "./data/preprocessed/test_logs_split_enum",
+                    "./data/test_scores.csv",
+                )
 
-    test_model(model, test_loader, device=device)
+                test_loss = test_model(model, test_loader, device=device)
+                results[str(hp)] = test_loss
+
+    results_sorted = sorted(results.items(), key=lambda item: item[1])
+    for result in results_sorted:
+        print(f"{result[0]}: {result[1]}")
 
 if __name__ == "__main__":
     main()
