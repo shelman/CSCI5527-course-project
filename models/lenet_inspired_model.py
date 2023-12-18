@@ -68,8 +68,8 @@ class LeNetInspiredModel(nn.Module):
     @classmethod
     def hyper_param_search(self):
         return {
-            "c1": range(3, 8),
-            "c2": range(3, 8),
-            "pool": range(10, 30, 4),
-            "lin1": range(60, 80, 5),
+            "c1": range(2, 10, 2),
+            "c2": range(2, 10, 2),
+            "pool": range(10, 50, 10),
+            "lin1": range(60, 90, 10),
         }

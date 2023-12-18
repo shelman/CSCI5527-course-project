@@ -10,7 +10,7 @@ from utils import collate_fn
 
 
 def create_dataloader(logs_folder, scores_file):
-    dataset = SplitDataset(logs_folder, scores_file)
+    dataset = SplitDataset(logs_folder, scores_file, cutoff=1500)
     return DataLoader(dataset, batch_size=10, shuffle=True, collate_fn=collate_fn)
 
 

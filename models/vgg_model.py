@@ -12,7 +12,7 @@ class VGGModel(nn.Module):
     the individual convolution layers don't affect the size.
     """
 
-    def __init__(self, truncate_columns=False):
+    def __init__(self, truncate_columns=False, c1=3, c2=7, c3=9, pool1=10, lin1=50):
         super(VGGModel, self).__init__()
 
         # optional extension gets rid of the cursor_position and
@@ -25,21 +25,21 @@ class VGGModel(nn.Module):
         self.convolutional_layers = nn.Sequential(
             nn.BatchNorm2d(1),
             
-            nn.Conv2d(1, 3, kernel_size=3, padding=1),
+            nn.Conv2d(1, c1, kernel_size=3, padding=1),
             nn.ReLU(),
-            nn.Conv2d(3, 5, kernel_size=3, padding=1),
+            nn.Conv2d(c1, c1, kernel_size=3, padding=1),
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=(5, 1)),
             
-            nn.Conv2d(5, 7, kernel_size=3, padding=1),
+            nn.Conv2d(c1, c2, kernel_size=3, padding=1),
             nn.ReLU(),
-            nn.Conv2d(7, 9, kernel_size=3, padding=1),
+            nn.Conv2d(c2, c2, kernel_size=3, padding=1),
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=(5, 1)),
 
-            nn.Conv2d(9, 11, kernel_size=3, padding=1),
+            nn.Conv2d(c2, c3, kernel_size=3, padding=1),
             nn.ReLU(),
-            nn.Conv2d(11, 13, kernel_size=3, padding=1),
+            nn.Conv2d(c3, c3, kernel_size=3, padding=1),
             nn.ReLU(),
             nn.MaxPool2d(kernel_size=(5, initial_columns)),
 
@@ -47,15 +47,15 @@ class VGGModel(nn.Module):
             # same size; because zero-padding works on a batch level, 
             # the different batches might have different sizes for their 
             # input arrays
-            nn.AdaptiveMaxPool2d((10, 1)),
+            nn.AdaptiveMaxPool2d((pool1, 1)),
 
             # flatten the height and width dimensions
             nn.Flatten(start_dim=1, end_dim=3),
         )
     
         self.linear_layers = nn.Sequential(
-            nn.Linear(130, 10),
-            nn.Linear(10, 1),
+            nn.Linear(pool1*c3, lin1),
+            nn.Linear(lin1, 1),
         )
         
 
@@ -80,3 +80,13 @@ class VGGModel(nn.Module):
         # add in a dimension representing a single channel, necessary
         # for the convolution
         return torch.unsqueeze(essay_batch, 1)
+    
+    @classmethod
+    def hyper_param_search(self):
+        return {
+            "c1": range(2, 6, 2),
+            "c2": range(6, 12, 2),
+            "c3": range(12, 18, 2),
+            "pool1": range(10, 50, 10),
+            "lin1": range(60, 90, 10),
+        }

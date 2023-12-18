@@ -13,7 +13,7 @@ class ConvLSTMModel(nn.Module):
     the individual convolution layers don't affect the size.
     """
 
-    def __init__(self, truncate_columns=False, channels=16, final_pool=10, lstm_hidden=64):
+    def __init__(self, truncate_columns=False, c1=8, c2=10, final_pool=20, lstm_hidden=64):
         super(ConvLSTMModel, self).__init__()
 
         # optional extension gets rid of the cursor_position and
@@ -26,13 +26,13 @@ class ConvLSTMModel(nn.Module):
         self.convolutional_layers = nn.Sequential(
             nn.BatchNorm2d(1),
 
-            nn.Conv2d(1, int(channels/2), kernel_size=(15, 3), padding=1),
-            nn.ReLU(),
+            nn.Conv2d(1, c1, kernel_size=(5, initial_columns), padding=1),
             nn.MaxPool2d(kernel_size=(5, 1)),
+            nn.ReLU(),
             
-            nn.Conv2d(int(channels/2), int(channels), kernel_size=(15, initial_columns)),
-            nn.ReLU(),
+            nn.Conv2d(c1, c2, kernel_size=(5, 1)),
             nn.MaxPool2d(kernel_size=(5, 1)),
+            nn.ReLU(),
 
             # this layer is important for getting the arrays all to the 
             # same size; because zero-padding works on a batch level, 
@@ -44,12 +44,13 @@ class ConvLSTMModel(nn.Module):
             nn.Flatten(start_dim=2, end_dim=3),
         )
 
-        self.lstm = nn.LSTM(channels, lstm_hidden, batch_first=True)
+        self.lstm = nn.LSTM(c2, lstm_hidden, batch_first=True)
         self.post_lstm_flatten = nn.Flatten(start_dim=1, end_dim=2)
 
-        mid_linear = int(lstm_hidden*final_pool/3)
+        mid_linear = 70
         self.linear_layers = nn.Sequential(
             nn.Linear(lstm_hidden*final_pool, mid_linear),
+            nn.ReLU(),
             nn.Linear(mid_linear, 1),
         )
         
@@ -89,7 +90,12 @@ class ConvLSTMModel(nn.Module):
     @classmethod
     def hyper_param_search(self):
         return {
-            "channels": range(10, 32, 4),
-            "final_pool": range(10, 100, 10),
+            "c1": [8],
+            "c2": [10],
+            "final_pool": [20],
             "lstm_hidden": range(64, 204, 20),
+            # "c1": range(2, 12, 4),
+            # "c2": range(12, 32, 4),
+            # "final_pool": range(10, 100, 10),
+            # "lstm_hidden": range(64, 204, 20),
         }
