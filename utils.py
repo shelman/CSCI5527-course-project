@@ -2,33 +2,31 @@ import pandas as pd
 import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader, random_split
-from sklearn.preprocessing import StandardScaler
 
-def get_data():
+
+def get_train_data():
     # train logs contains about 5000 logs without labels
     train_logs = pd.read_csv("./dataset/new_train_logs.csv", index_col=0)
     # train scores only contain labels for each id
     train_scores = pd.read_csv("./dataset/new_train_scores.csv", index_col=0)
     train_essays = pd.read_csv("./dataset/train_essays.csv", index_col=0)
-    test_logs = pd.read_csv("./dataset/test_logs.csv")
+    
+    return train_logs, train_scores, train_essays
 
-    return train_logs, train_scores, train_essays, test_logs
+
 
 class TrainingDataset(Dataset):
     def __init__(self, data, labels, extras):
-        self.data = self._generate_senquence_(data)
-        self.labels = self._align_index_(data, labels).values
-        self.extras = self._align_index_(data, extras).values
+        self.data = self._generate_sequence_(data)
+        self.labels = labels.values
+        self.extras = extras.values
 
-    def _generate_senquence_(self, data):
+    def _generate_sequence_(self, data):
         sequences_data = []
         grouped_data = data.groupby(["id"])
         for _, x in grouped_data:
             sequences_data.append(x.values)
         return sequences_data
-    
-    def _align_index_(self, df1, df2):
-        return df2.reindex(df1.index)
 
     def __len__(self):
         return len(self.data)
@@ -50,8 +48,8 @@ def padding(sequence, max_length):
     padded_seq = torch.cat((sequence, pad_zeros))
     return padded_seq
 
-def create_training_dataloader(batch_size):
-    train_logs, train_scores, train_essays, test_logs = get_data()
+def create_train_dataloader(batch_size):
+    train_logs, train_scores, train_essays = get_train_data()
 
     train_dataset = TrainingDataset(train_logs, train_scores, train_essays)
 
@@ -67,4 +65,4 @@ def create_training_dataloader(batch_size):
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, collate_fn=collate_fn)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, collate_fn=collate_fn)
 
-    return train_loader, val_loader, len(train_dataset)
+    return train_loader, val_loader
