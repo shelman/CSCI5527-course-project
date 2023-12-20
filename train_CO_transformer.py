@@ -4,7 +4,7 @@ import torch.optim as optim
 import numpy as np
 
 from utils_trans import create_training_dataloader
-from transformers import BertModel, BertConfig, BertTokenizer, BertForSequenceClassification, CamembertModel, get_linear_schedule_with_warmup
+from transformers import BertModel, BertConfig, BertTokenizer, BertForSequenceClassification, CamembertModel, get_linear_schedule_with_warmup, RobertaConfig, RobertaTokenizer, RobertaModel
 
 
 
@@ -16,48 +16,54 @@ device = (
     else "cpu"
 )
 
-device = "cpu"
-
-
-tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+print(device)
 
 batch_size = 1
-
 training_loader, validation_loader, sample_size = create_training_dataloader(batch_size=batch_size)
+
+class CustomRobertaForRegression(nn.Module):
+    def __init__(self, model_name='roberta-base', num_labels=1, num_layers_to_freeze=164):
+        super(CustomRobertaForRegression, self).__init__()
+        
+        # Load RoBERTa configuration
+        config = RobertaConfig.from_pretrained(model_name)
+
+        
+        # Load pre-trained RoBERTa model
+        self.roberta = RobertaModel.from_pretrained(model_name, config=config)
+        
+        # Iterate through the layers and freeze/unfreeze accordingly
+        for i, param in enumerate(self.roberta.parameters()):
+            if (i <= num_layers_to_freeze) and (i>5):
+                param.requires_grad = False
+            else:
+                param.requires_grad = True
+
+        # Modify the model's head for regression
+        self.roberta.config.num_labels = num_labels
+        #self.roberta.pooler.dense = nn.Linear(config.hidden_size, num_labels)
+        self.regressor = nn.Linear(config.hidden_size, 1, dtype=torch.float32)  # Assuming BERT's hidden size is 768
+        self.roberta.pooler.activation = nn.Identity()
+
+        for name, param in self.roberta.named_parameters():
+            print(name, param.requires_grad)
+
+
+    def forward(self, input_ids, attention_mask, token_type_ids=None, position_ids=None, head_mask=None, labels=None):
+        outputs = self.roberta(input_ids, attention_mask=attention_mask, head_mask=head_mask)
+        lhs_output = outputs.last_hidden_state
+        logits = self.regressor(lhs_output)
+        return logits
 
 
 # Define a simple regression model using BERT as a feature extractor
 class RegressionModel(nn.Module):
     def __init__(self):
         super(RegressionModel, self).__init__()
-        #self.conv1 = nn.Conv2d(1, out_channels=hidden_channels, kernel_size=(10, 13))
-        #self.relu1 = nn.LeakyReLU()
-        #self.pool1 = nn.MaxPool2d(kernel_size=(10,1))
-        #self.conv2 = nn.Conv2d(hidden_channels, out_channels=hidden_channels, kernel_size=(10, 1))
-        #self.relu2 = nn.LeakyReLU()
-        #self.pool2 = nn.MaxPool2d(kernel_size=(10,1))
-        #self.conv3 = nn.Conv2d(hidden_channels, out_channels=2, kernel_size=(10, 1))
-        #self.relu3 = nn.LeakyReLU()
-        #self.pool3 = nn.MaxPool2d(kernel_size=(10,1))
-        #self.bert = BertForSequenceClassification.from_pretrained('bert-base-uncased')
-        self.bert = CamembertModel.from_pretrained('camembert-base')
+        self.bert = RobertaModel.from_pretrained('roberta-base')
         self.regressor = nn.Linear(hidden_size, 1, dtype=torch.float32)  # Assuming BERT's hidden size is 768
 
     def forward(self, input_ids, attention_mask):
-        #input = torch.unsqueeze(input_ids, attention_mask dim=1)
-        #x = self.conv1(input)
-        #x = self.relu1(x)
-        #x = self.pool1(x)
-        #x = self.conv2(x)
-        #x = self.relu2(x)
-        #x = self.pool2(x)
-        #x = self.conv3(x)
-        #x = self.relu3(x)
-        #x = self.pool3(x)
-        #x = torch.squeeze(x, dim=-1)
-        #x = x.permute(0, 2, 1)
-        #x = x.view(-1, 1)
-
         outputs = self.bert(input_ids, attention_mask)
         pooled_output = outputs.pooler_output
         logits = self.regressor(pooled_output)
@@ -70,33 +76,48 @@ output_size = 1
 
 
 # Instantiate the model, optimizer, and loss function
-model = RegressionModel().to(device)
-
-
+model = CustomRobertaForRegression().to(device)
 optimizer = torch.optim.AdamW(model.parameters(), lr=2e-5)
 criterion = nn.MSELoss()
+
+# Load weights from a .pth file
+checkpoint_path = 'RoBERTa_lhs.pth'
+checkpoint = torch.load(checkpoint_path, map_location=torch.device(device))  # Specify map_location based on your device
+
+# Load the model state_dict from the checkpoint
+model.load_state_dict(checkpoint)
 
 
 # Define window size and overlap
 window_size = 700
 overlap = 100
 
+tokenizer = RobertaTokenizer.from_pretrained('roberta-base')
 
-epochs = 5
-total_steps = len(training_loader) * epochs
-scheduler = get_linear_schedule_with_warmup(optimizer,       
-                 num_warmup_steps=0, num_training_steps=total_steps)
+
+
+epochs = 1
+
+# Define gradient accumulation steps
+gradient_accumulation_steps = 25
 
 
 for epoch in range(epochs):
     model.train()
     total_loss = 0
-
+    step = 0
     for batch in training_loader:
         input_ids, targets = batch
 
-        # Concatenate values across columns with spaces
+        #if (targets > 3) and (targets < 4.5):
+            #next
+        #else:
+            # Concatenate values across columns with spaces
         result_string = ' '.join([' '.join(map(str, arr)) for arr in input_ids])
+        
+        characters_to_remove = '\[]"\''
+        translation_table = str.maketrans("", "", characters_to_remove)
+        result_string = result_string.translate(translation_table)
 
         # Initialize a list to store tokenized results
         input_ids = []
@@ -104,19 +125,34 @@ for epoch in range(epochs):
 
         # Split the long text into 500-character increments
         for i in range(0, len(result_string), window_size):
-            if np.random.uniform() < .05:
-                segment = result_string[i:i+window_size]
-                
-                # Tokenize the segment
-                tokens = tokenizer(segment, padding='max_length', return_tensors='pt')
-            
-                # Append the tokenized result to the list
-                input_ids.append(tokens['input_ids'])
-                attn_masks.append(tokens['attention_mask'])
+            if np.random.uniform() < .15:
+                if len(input_ids) < 25:
+                    segment = result_string[i:i+window_size]
+                    
+                    # Tokenize the segment
+                    tokens = tokenizer(segment, padding='max_length', return_tensors='pt')
+
+                    if tokens['input_ids'].size(1) == 512:
+                    # Append the tokenized result to the list
+                        input_ids.append(tokens['input_ids'])
+                        attn_masks.append(tokens['attention_mask'])
+                else:
+                    next
             else:
                 next
+        if len(input_ids) < 1:
+            segment = result_string[i:i+window_size]
+            
+            # Tokenize the segment
+            tokens = tokenizer(segment, padding='max_length', return_tensors='pt')
+        
+            # Append the tokenized result to the list
+            input_ids.append(tokens['input_ids'])
+            attn_masks.append(tokens['attention_mask'])
 
-        targets = targets.repeat(len(input_ids), 1).to(dtype=torch.float32).to(device)
+
+        #targets = targets.repeat(len(input_ids), 1).to(dtype=torch.float32).to(device)
+        targets = targets.to(dtype=torch.float32).to(device)
         input_ids = torch.cat(input_ids, dim=0).to(device)
         attn_masks = torch.cat(attn_masks, dim=0).to(device)
 
@@ -124,21 +160,32 @@ for epoch in range(epochs):
         attn_masks = attn_masks
 
         outputs = model(input_ids, attn_masks)
-        loss = criterion(outputs.squeeze(), targets.squeeze())
+        aggregated_logits = torch.mean(outputs, dim=1, keepdim=False)
+        aggregated_logits = torch.mean(aggregated_logits, dim=0, keepdim=True)
+
+        loss = criterion(aggregated_logits, targets)
 
         loss = loss.to(dtype=torch.float32)
         print(loss)
+        outputs_cpu = aggregated_logits.cpu()
+        print(aggregated_logits.item())
 
         loss.backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-        optimizer.step()
-        scheduler.step()
-        optimizer.zero_grad()
+        #torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
 
-        total_loss += loss.item()
+        if (step + 1) % gradient_accumulation_steps == 0:
+            total_loss += loss.item()
+            # Update optimizer and scheduler
+            optimizer.step()
+            optimizer.zero_grad()
+            #scheduler.step()
+            torch.save(model.state_dict(), 'RoBERTa_lhs.pth')
+        step += 1
 
     average_loss = total_loss / len(training_loader)
     print(f'Epoch {epoch + 1}/{epochs}, Loss: {average_loss}')
+
+
     '''
     # Validation loop
     model.eval()
