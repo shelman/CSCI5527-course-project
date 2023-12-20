@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.optim as optim
 import pandas as pd
 
-from utils import create_train_dataloader
+from utils_hybrid import create_train_dataloader
 
 
 device = (
@@ -14,7 +14,7 @@ device = (
     else "cpu"
 )
 
-batch_size = 16
+batch_size = 32
 train_loader, val_loader = create_train_dataloader(batch_size)
 
 class myNN(nn.Module):
@@ -24,9 +24,10 @@ class myNN(nn.Module):
         self.relu1 = nn.LeakyReLU()
         self.pool1 = nn.MaxPool2d(kernel_size=(5,1))
         #self.adaptivepool = nn.AdaptiveAvgPool2d(1)
-        self.lstm = nn.LSTM(input_size, hidden_size)
-        # self.layernorm = nn.LayerNorm(hidden_size + extra_features_size)
+        self.lstm = nn.LSTM(input_size, hidden_size, num_layers=2)
+        self.layernorm = nn.LayerNorm(hidden_size + extra_features_size)
         self.batchnorm = nn.BatchNorm1d(hidden_size + extra_features_size)
+        self.instancenorm = nn.InstanceNorm1d(hidden_size + extra_features_size, affine=True)
         self.fc = nn.Linear(hidden_size + extra_features_size, output_size)
 
     def forward(self, input, extra_features):
@@ -38,23 +39,30 @@ class myNN(nn.Module):
         x = x.permute(2, 0, 1)
         #x = self.adaptivepool(x)
 
-        # output, _ = self.lstm(x)
-        _, (h_n, _) = self.lstm(x)
+        output, (h_n, c_n) = self.lstm(x)
         #h_n.view(batch_size,-1)
         
         # Concatenate the LSTM output with additional features
-        # x = torch.cat((output[-1, :, :], extra_features), dim=1)
-        x = torch.cat((h_n[-1,:,:], extra_features), dim=1)
+        l = output.size(0)
+        extra_features = extra_features.unsqueeze(0).repeat(l, 1, 1)
+        x = torch.cat((output, extra_features), dim=2).permute(1, 2, 0)
+        x = self.batchnorm(x)
+        x = torch.mean(x.permute(2, 0, 1), dim=0)
+        # x = self.instancenorm(x)
+        # x = torch.max(x.permute(2, 0, 1), dim=0)[0]
+        
+        # x = torch.cat((h_n[-1,:,:], extra_features), dim=1)
+        # x = torch.cat((c_n[-1,:,:], extra_features), dim=1)
 
         # Pass the combined features through the fully connected layer
         # x = self.layernorm(x)
-        x = self.batchnorm(x)
+        # x = self.batchnorm(x)
         x = self.fc(x)
         return x
 
 # Define input size, hidden layer size, and output size
 input_size = len(train_loader.dataset[0][0][0])
-hidden_size = 16
+hidden_size = 32
 output_size = 1
 extra_feature_size = len(train_loader.dataset[0][2])
 
@@ -67,7 +75,7 @@ print(model)
 criterion = nn.MSELoss()
 optimizer = optim.Adam(model.parameters())
 
-epochs = 25
+epochs = 100
 for epoch in range(epochs):
     print(f"Epoch {epoch + 1}/{epochs}")
 

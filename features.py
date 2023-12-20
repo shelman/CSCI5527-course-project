@@ -24,6 +24,9 @@ def count_char(input_str):
             return count
         
         for char in input_str:
+            if char == "=":
+                count = 0
+
             if char.isalnum():
                 count += 1
         return count
@@ -38,21 +41,17 @@ train_scores = pd.read_csv("./dataset/train_scores.csv")
 New features: pause
 '''
 time_gap = []
-# gap_pct = []
 
 for _, group in train_logs.groupby("id"):
     diff = group["down_time"] - group["up_time"].shift(1).fillna(0)
     time_gap.append(diff)
-    # gap_pct.append(diff / diff.sum())
 
 pause = pd.concat(time_gap, axis=0)
 pause.name = "pause"
 pause[pause < 0] = 0
-# pause_pct = pd.concat(gap_pct, axis=0)
-# pause_pct.name = "pause_pct"
+
 
 train_logs = pd.concat([train_logs, pause], axis=1)
-# train_logs = pd.concat([train_logs, pause, pause_pct], axis=1)
 
 '''
 Process the attribute activity for one hot encoding
@@ -162,13 +161,19 @@ for idx, group in train_logs.groupby("id"):
     for i, g in group.iterrows():
         if g["pause"] >= 1000 and g["Input"] == 1:
             p_counter += 1
+            r_char = 0
+            continue
         elif g["Input"] == 1:
             p_char += g["text_change"]
 
         if g["Nonproduction"] == 1 or g["Paste"] == 1 or g["Replace"] == 1:
             r_counter += 1
+            p_char = 0
+            continue
         elif g["pause"] >= 1000 and g["Remove/Cut"] == 1:
             r_counter +=1
+            p_char = 0
+            continue
         elif g["Input"] == 1:
             r_char += g["text_change"]
         

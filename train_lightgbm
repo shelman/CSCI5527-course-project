@@ -1,0 +1,34 @@
+import lightgbm as lgb
+from sklearn.model_selection import GridSearchCV, train_test_split
+import random
+from sklearn.metrics import mean_squared_error
+import numpy as np
+
+from utils_hybrid import get_train_data
+
+_, y, X = get_train_data()
+
+# Split the data into training and testing sets
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=5527)
+
+model = lgb.LGBMRegressor()
+
+# Define the hyperparameters grid to search
+param_grid = {
+    'num_leaves': [random.randint(10, 30)],
+    'learning_rate': [0.5, 0.1, 0.01],
+    'max_depth': [1, 2, 3, 4, 5]
+}
+
+# Perform GridSearchCV with cross-validation
+grid_search = GridSearchCV(model, param_grid, cv=10, scoring="neg_root_mean_squared_error")
+grid_search.fit(X_train, y_train)
+
+# Get the best parameters and the best score
+print("Best Parameters:", grid_search.best_params_)
+print("Best score:", grid_search.best_score_)
+
+best_model = grid_search.best_estimator_
+y_pred = best_model.predict(X_test)
+rmse = mean_squared_error(y_test, y_pred, squared=False)
+print("Test Set RMSE with Best Model:", rmse)
