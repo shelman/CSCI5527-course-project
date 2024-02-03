@@ -4,7 +4,7 @@ import torch.optim as optim
 import numpy as np
 
 from utils_trans import create_training_dataloader
-from transformers import BertModel, BertConfig, BertTokenizer, BertForSequenceClassification, CamembertModel, get_linear_schedule_with_warmup, RobertaConfig, RobertaTokenizer, RobertaModel
+from transformers import BertModel, BertConfig, BertTokenizer, BertForSequenceClassification, CamembertModel, get_linear_schedule_with_warmup, RobertaConfig, RobertaTokenizer, RobertaModel, LongformerTokenizer, LongformerForSequenceClassification, LongformerConfig
 
 
 
@@ -21,53 +21,41 @@ print(device)
 batch_size = 1
 training_loader, validation_loader, sample_size = create_training_dataloader(batch_size=batch_size)
 
-class CustomRobertaForRegression(nn.Module):
-    def __init__(self, model_name='roberta-base', num_labels=1, num_layers_to_freeze=164):
-        super(CustomRobertaForRegression, self).__init__()
+class CustomLFForRegression(nn.Module):
+    def __init__(self, model_name='allenai/longformer-base-4096', num_labels=1, num_layers_to_freeze=202):
+        super(CustomLFForRegression, self).__init__()
         
         # Load RoBERTa configuration
-        config = RobertaConfig.from_pretrained(model_name)
-
+        config = LongformerConfig.from_pretrained(model_name)
+        config.num_labels = 1
         
         # Load pre-trained RoBERTa model
-        self.roberta = RobertaModel.from_pretrained(model_name, config=config)
+        self.longf = LongformerForSequenceClassification.from_pretrained(model_name, config=config)
         
         # Iterate through the layers and freeze/unfreeze accordingly
-        for i, param in enumerate(self.roberta.parameters()):
-            if (i <= num_layers_to_freeze) and (i>5):
+        for i, param in enumerate(self.longf.parameters()):
+            if (i <= num_layers_to_freeze) and (i>4):
                 param.requires_grad = False
             else:
                 param.requires_grad = True
 
         # Modify the model's head for regression
-        self.roberta.config.num_labels = num_labels
+        #self.longf.config.num_labels = num_labels
         #self.roberta.pooler.dense = nn.Linear(config.hidden_size, num_labels)
         self.regressor = nn.Linear(config.hidden_size, 1, dtype=torch.float32)  # Assuming BERT's hidden size is 768
-        self.roberta.pooler.activation = nn.Identity()
+        #self.longf.pooler.activation = nn.Identity()
 
-        for name, param in self.roberta.named_parameters():
+        for name, param in self.longf.named_parameters():
             print(name, param.requires_grad)
 
 
     def forward(self, input_ids, attention_mask, token_type_ids=None, position_ids=None, head_mask=None, labels=None):
-        outputs = self.roberta(input_ids, attention_mask=attention_mask, head_mask=head_mask)
-        lhs_output = outputs.last_hidden_state
-        logits = self.regressor(lhs_output)
+        outputs = self.longf(input_ids, attention_mask=attention_mask, head_mask=head_mask)
+        logits = outputs.logits
+        #logits = self.regressor(lhs_output)
         return logits
 
 
-# Define a simple regression model using BERT as a feature extractor
-class RegressionModel(nn.Module):
-    def __init__(self):
-        super(RegressionModel, self).__init__()
-        self.bert = RobertaModel.from_pretrained('roberta-base')
-        self.regressor = nn.Linear(hidden_size, 1, dtype=torch.float32)  # Assuming BERT's hidden size is 768
-
-    def forward(self, input_ids, attention_mask):
-        outputs = self.bert(input_ids, attention_mask)
-        pooled_output = outputs.pooler_output
-        logits = self.regressor(pooled_output)
-        return logits
 
 # Define input size, hidden layer size, and output size
 hidden_channels = 32
@@ -76,12 +64,12 @@ output_size = 1
 
 
 # Instantiate the model, optimizer, and loss function
-model = CustomRobertaForRegression().to(device)
+model = CustomLFForRegression().to(device)
 optimizer = torch.optim.AdamW(model.parameters(), lr=2e-5)
 criterion = nn.MSELoss()
 
 # Load weights from a .pth file
-checkpoint_path = 'RoBERTa_lhs.pth'
+checkpoint_path = 'LF_lhs.pth'
 checkpoint = torch.load(checkpoint_path, map_location=torch.device(device))  # Specify map_location based on your device
 
 # Load the model state_dict from the checkpoint
@@ -89,10 +77,10 @@ model.load_state_dict(checkpoint)
 
 
 # Define window size and overlap
-window_size = 700
+window_size = 5600
 overlap = 100
 
-tokenizer = RobertaTokenizer.from_pretrained('roberta-base')
+tokenizer = LongformerTokenizer.from_pretrained('allenai/longformer-base-4096')
 
 
 
@@ -125,14 +113,14 @@ for epoch in range(epochs):
 
         # Split the long text into 500-character increments
         for i in range(0, len(result_string), window_size):
-            if np.random.uniform() < .15:
-                if len(input_ids) < 25:
+            if np.random.uniform() < .5:
+                if len(input_ids) < 5:
                     segment = result_string[i:i+window_size]
                     
                     # Tokenize the segment
                     tokens = tokenizer(segment, padding='max_length', return_tensors='pt')
 
-                    if tokens['input_ids'].size(1) == 512:
+                    if tokens['input_ids'].size(1) == 4096:
                     # Append the tokenized result to the list
                         input_ids.append(tokens['input_ids'])
                         attn_masks.append(tokens['attention_mask'])
@@ -160,8 +148,8 @@ for epoch in range(epochs):
         attn_masks = attn_masks
 
         outputs = model(input_ids, attn_masks)
-        aggregated_logits = torch.mean(outputs, dim=1, keepdim=False)
-        aggregated_logits = torch.mean(aggregated_logits, dim=0, keepdim=True)
+        aggregated_logits = torch.mean(outputs, dim=0, keepdim=True)
+        #aggregated_logits = torch.mean(aggregated_logits, dim=0, keepdim=True)
 
         loss = criterion(aggregated_logits, targets)
 
@@ -179,7 +167,7 @@ for epoch in range(epochs):
             optimizer.step()
             optimizer.zero_grad()
             #scheduler.step()
-            torch.save(model.state_dict(), 'RoBERTa_lhs.pth')
+            torch.save(model.state_dict(), 'LF_lhs.pth')
         step += 1
 
     average_loss = total_loss / len(training_loader)

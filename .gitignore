@@ -164,3 +164,4 @@ linking-writing-processes-to-writing-quality/train_scores.csv
 linking-writing-processes-to-writing-quality/train_logs.csv
 
 .csv
+.pth

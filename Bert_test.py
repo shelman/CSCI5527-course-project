@@ -1,7 +1,7 @@
-import torch
-if torch.backends.mps.is_available():
-    mps_device = torch.device("mps")
-    x = torch.ones(1, device=mps_device)
-    print (x)
-else:
-    print ("MPS device not found.")
+from transformers import RobertaTokenizer
+
+tokenizer = RobertaTokenizer.from_pretrained("roberta-base")
+print(tokenizer("24")["input_ids"])
+
+
+print(tokenizer("25")["input_ids"])

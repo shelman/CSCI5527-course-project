@@ -5,6 +5,8 @@ from torch.utils.data import Dataset, DataLoader, random_split
 from sklearn.preprocessing import StandardScaler
 
 
+
+
 def get_data():
     # train logs contains about 5000 logs without labels
     train_logs = pd.read_csv("./linking-writing-processes-to-writing-quality/train_logs.csv")
@@ -115,7 +117,7 @@ def create_training_dataloader(batch_size):
     val_size = dataset_size - train_size  # 20% for validation
 
     # Use random_split to create training and validation datasets
-    train_dataset, val_dataset = random_split(training_dataset, [train_size, val_size])
+    train_dataset, val_dataset = random_split(training_dataset, [train_size, val_size], generator=torch.Generator().manual_seed(42))
 
     # Now you can create DataLoader instances for training and validation
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, collate_fn=collate_fn)
